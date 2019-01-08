@@ -90,6 +90,7 @@ private:
     scheduler::Network *network = NULL;
 
     const int frameSize = 4096;
+    const int hopSize = 256;
 
     void runNetwork();
 
