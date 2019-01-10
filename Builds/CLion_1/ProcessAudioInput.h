@@ -54,6 +54,7 @@
 #include <essentia/streaming/algorithms/poolstorage.h>
 #include <essentia/streaming/streamingalgorithm.h>
 #include <essentia/streaming/algorithms/fileoutput.h>
+#include <essentia/algorithms/io/yamloutput.h>
 
 
 using namespace essentia;
@@ -64,6 +65,7 @@ using namespace essentia::streaming;
 
 //==============================================================================
 class MainContentComponent : public AudioAppComponent {
+
 public:
     //==============================================================================
     MainContentComponent();
@@ -85,6 +87,7 @@ private:
     Label levelLabel;
     TextButton start;
     RingBufferInput *gen;
+    TextButton saveSample;
 
     Pool pool;
     scheduler::Network *network = NULL;
@@ -93,8 +96,11 @@ private:
     const int hopSize = 256;
 
     void runNetwork();
+    void buttonClicked();
 
     std::thread audioProcessor;
+
+    essentia::standard::YamlOutput yamlOutput;
 
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainContentComponent)

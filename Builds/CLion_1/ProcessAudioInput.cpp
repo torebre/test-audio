@@ -15,6 +15,10 @@ MainContentComponent::MainContentComponent() {
     addAndMakeVisible(levelSlider);
     addAndMakeVisible(levelLabel);
 
+    addAndMakeVisible(saveSample);
+    saveSample.setButtonText("Save sample");
+    saveSample.onClick = [this] { buttonClicked(); };
+
     setSize(600, 100);
     setAudioChannels(2, 2);
 
@@ -72,11 +76,10 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
     mfcc->output("mfcc") >> essentia::streaming::PoolConnector(pool, "lowlevel.mfcc"); // store only the mfcc coeffs
 
 
-    Algorithm* file = new FileOutput<Real>();
-    file->configure("filename", "test_output.txt", "mode", "text");
+    Algorithm *file = new FileOutput<Real>();
+    file->configure("filename", "test_output2.txt", "mode", "text");
 
     gen->output("signal") >> file->input("data");
-
 
 
     network = new scheduler::Network(gen);
@@ -130,7 +133,7 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
                 auto audioBuffer = std::vector<Real>(static_cast<unsigned long>(bufferToFill.numSamples));
 
 
-                if(audioBuffer.size() != frameSize) {
+                if (audioBuffer.size() != frameSize) {
                     gen->output(0).
                             setAcquireSize(bufferToFill
                                                    .numSamples);
@@ -149,8 +152,10 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
                     audioBuffer[sample] = inBuffer[sample];
                 }
 
-                std::cout << "Number of samples: "; // << &audioBuffer[0];
+//                std::cout << "Number of samples: "; // << &audioBuffer[0];
 
+//                const std::string valueString("mfcc");
+//                auto value = pool.value(&valueString);
 
 //                auto temp = std::vector<Real> { 1.0, 2.0, 3.0, 4.0, 5.0};
 
@@ -160,6 +165,8 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
 
 
                 gen->add(&audioBuffer[0], bufferToFill.numSamples);
+
+
 
 
 //                auto keys = gen->parameterDescription.keys();
@@ -172,9 +179,17 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
     }
 }
 
+void MainContentComponent::buttonClicked() {
+    DBG("Clicked");
+
+    // TODO
+
+}
+
 
 void MainContentComponent::resized() {
-    start.setBounds(10, 40, 90, 20);
     levelLabel.setBounds(10, 10, 90, 20);
     levelSlider.setBounds(100, 10, getWidth() - 110, 20);
+    start.setBounds(10, 40, 90, 20);
+    saveSample.setBounds(10, 40, 90, 20);
 }
