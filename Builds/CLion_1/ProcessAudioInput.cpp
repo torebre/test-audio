@@ -70,24 +70,35 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
     w->output("frame") >> spec->input("frame");
 
 // Spectrum -> MFCC -> Pool
-    spec->output("spectrum") >> mfcc->input("spectrum");
+//    spec->output("spectrum") >> mfcc->input("spectrum");
 
-    mfcc->output("bands") >> NOWHERE;                   // we don't want the mel bands
-    mfcc->output("mfcc") >> essentia::streaming::PoolConnector(pool, "lowlevel.mfcc"); // store only the mfcc coeffs
+//    mfcc->output("bands") >> NOWHERE;                   // we don't want the mel bands
+//    mfcc->output("mfcc") >> essentia::streaming::PoolConnector(pool, "lowlevel.mfcc"); // store only the mfcc coeffs
 
 
-    Algorithm *file = new FileOutput<Real>();
-    file->configure("filename", "test_output2.txt", "mode", "text");
+//    spec->output("spectrum") >> essentia::streaming::PoolConnector(pool, "spectrum");
 
-    gen->output("signal") >> file->input("data");
+    streaming::Algorithm* pitchYinFft = streaming::AlgorithmFactory::create("PitchYinFFT",
+                                                                          "frameSize", frameSize);
 
+    spec->output("spectrum") >> pitchYinFft->input("spectrum");
+
+//    Algorithm *file = new FileOutput<Real>();
+//    file->configure("filename", "test_output2.txt", "pitchyinfft", "text");
+
+//    gen->output("signal") >> file->input("data");
+
+    pitchYinFft->output("pitch") >> essentia::streaming::PoolConnector(pool, "pitch");
+    pitchYinFft->output("pitchConfidence") >> essentia::streaming::PoolConnector(pool, "pitchConfidence");
 
     network = new scheduler::Network(gen);
 //        network->initStack();
 
+
 // TODO Is it necessary to run this here?
     audioProcessor = std::thread(&MainContentComponent::runNetwork, this);
 //    network->run();
+
 
 
 }
@@ -183,6 +194,17 @@ void MainContentComponent::buttonClicked() {
     DBG("Clicked");
 
     // TODO
+
+//    standard::Algorithm* pitchYinFft = standard::AlgorithmFactory::create("PitchYinFFT",
+//            "frameSize", frameSize);
+
+//    pitchYinFft->input()
+
+
+    standard::Algorithm* output = standard::AlgorithmFactory::create("YamlOutput",
+                                                                     "filename", "test_pitchyinfft.yaml");
+    output->input("pool").set(pool);
+    output->compute();
 
 }
 
