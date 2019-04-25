@@ -83,8 +83,6 @@ public:
     void resized() override;
 
 private:
-    Slider levelSlider;
-    Label levelLabel;
     TextButton start;
     RingBufferInput *gen;
     TextButton saveSample;
@@ -92,8 +90,8 @@ private:
     Pool pool;
     scheduler::Network *network = NULL;
 
-    const int frameSize = 4096;
-    const int hopSize = 256;
+    const int frameSize = 1024;
+    const int hopSize = 512;
 
     void runNetwork();
     void buttonClicked();

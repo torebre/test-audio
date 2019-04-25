@@ -5,15 +5,8 @@
 MainContentComponent::MainContentComponent() {
     essentia::init();
 
-    levelSlider.setRange(0.0, 0.25);
-    levelSlider.setTextBoxStyle(Slider::TextBoxRight, false, 100, 20);
-    levelLabel.setText("Noise Level", dontSendNotification);
-
     addAndMakeVisible(start);
     start.setButtonText("Start");
-
-    addAndMakeVisible(levelSlider);
-    addAndMakeVisible(levelLabel);
 
     addAndMakeVisible(saveSample);
     saveSample.setButtonText("Save sample");
@@ -26,7 +19,7 @@ MainContentComponent::MainContentComponent() {
 
 
 void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate) {
-//    essentia::init();
+    DBG("Samples per block expected: " +std::to_string(samplesPerBlockExpected) +". Sample rate: " +std::to_string(sampleRate));
 
     AlgorithmFactory &factory = streaming::AlgorithmFactory::instance();
 
@@ -41,42 +34,18 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
     gen->output(0).setAcquireSize(frameSize);
     gen->output(0).setReleaseSize(frameSize);
 
-//    factory.create("RingBufferInput");
-
-//        *gen = factory.create("RingBufferInput",
-//                                          "bufferSize", frameSize);
-
     Algorithm *fc = factory.create("FrameCutter",
                                    "frameSize", frameSize,
                                    "hopSize", hopSize);
 
     Algorithm *w = factory.create("Windowing",
-                                  "type", "blackmanharris62");
-
+                                  "type", "hann");
     Algorithm *spec = factory.create("Spectrum");
-    Algorithm *mfcc = factory.create("MFCC");
-
-/////////// CONNECTING THE ALGORITHMS ////////////////
-    std::cout << "-------- connecting algos --------" << std::endl;
-
-// Audio -> FrameCutter
-
 
     gen->output("signal") >> fc->input("signal");
-//        audio->output("audio") >> fc->input("signal");
 
-// FrameCutter -> Windowing -> Spectrum
     fc->output("frame") >> w->input("frame");
     w->output("frame") >> spec->input("frame");
-
-// Spectrum -> MFCC -> Pool
-//    spec->output("spectrum") >> mfcc->input("spectrum");
-
-//    mfcc->output("bands") >> NOWHERE;                   // we don't want the mel bands
-//    mfcc->output("mfcc") >> essentia::streaming::PoolConnector(pool, "lowlevel.mfcc"); // store only the mfcc coeffs
-
-
-//    spec->output("spectrum") >> essentia::streaming::PoolConnector(pool, "spectrum");
 
     streaming::Algorithm* pitchYinFft = streaming::AlgorithmFactory::create("PitchYinFFT",
                                                                           "frameSize", frameSize);
@@ -90,6 +59,9 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
 
     pitchYinFft->output("pitch") >> essentia::streaming::PoolConnector(pool, "pitch");
     pitchYinFft->output("pitchConfidence") >> essentia::streaming::PoolConnector(pool, "pitchConfidence");
+
+    // TODO Why is there no output spectrum in the yaml-file?
+    spec->output("spectrum") >> essentia::streaming::PoolConnector(pool, "spectrum");
 
     network = new scheduler::Network(gen);
 //        network->initStack();
@@ -115,11 +87,7 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
     auto maxInputChannels = activeInputChannels.getHighestBit() + 1;
     auto maxOutputChannels = activeOutputChannels.getHighestBit() + 1;
 
-
-    auto level = (float) levelSlider.getValue();
-
-    for (
-            auto channel = 0;
+    for (auto channel = 0;
             channel < maxOutputChannels;
             ++channel) {
         if ((!activeOutputChannels[channel]) || maxInputChannels == 0) {
@@ -127,14 +95,14 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
                     clear(channel, bufferToFill
                     .startSample, bufferToFill.numSamples);
         } else {
-            auto actualInputChannel = channel % maxInputChannels; // [1]
+            auto actualInputChannel = channel % maxInputChannels;
 
-            if (!activeInputChannels[channel]) // [2]
+            if (!activeInputChannels[channel])
             {
                 bufferToFill.buffer->
                         clear(channel, bufferToFill
                         .startSample, bufferToFill.numSamples);
-            } else // [3]
+            } else
             {
                 auto *inBuffer = bufferToFill.buffer->getReadPointer(actualInputChannel,
                                                                      bufferToFill.startSample);
@@ -144,15 +112,16 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
                 auto audioBuffer = std::vector<Real>(static_cast<unsigned long>(bufferToFill.numSamples));
 
 
-                if (audioBuffer.size() != frameSize) {
-                    gen->output(0).
-                            setAcquireSize(bufferToFill
-                                                   .numSamples);
-                    gen->output(0).
-                            setReleaseSize(bufferToFill
-                                                   .numSamples);
-
-                }
+                // TODO Is this needed?
+//                if (audioBuffer.size() != frameSize) {
+//                    gen->output(0).
+//                            setAcquireSize(bufferToFill
+//                                                   .numSamples);
+//                    gen->output(0).
+//                            setReleaseSize(bufferToFill
+//                                                   .numSamples);
+//
+//                }
 
                 for (
                         auto sample = 0;
@@ -163,55 +132,53 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
                     audioBuffer[sample] = inBuffer[sample];
                 }
 
-//                std::cout << "Number of samples: "; // << &audioBuffer[0];
-
-//                const std::string valueString("mfcc");
-//                auto value = pool.value(&valueString);
-
-//                auto temp = std::vector<Real> { 1.0, 2.0, 3.0, 4.0, 5.0};
-
-//                for(unsigned long i = 0; i < temp.size(); ++i) {
-//                    std::cout << "Test32: " << temp[i];
-//                }
-
-
                 gen->add(&audioBuffer[0], bufferToFill.numSamples);
 
 
-
-
-//                auto keys = gen->parameterDescription.keys();
-//                for(unsigned long i = 0; i < keys.size(); ++i) {
-//                    std::cout << "Test31: " << gen->parameterDescription.keys()[i];
-//                }
-//                gen->add(&temp[0], 3);
             }
         }
     }
 }
 
 void MainContentComponent::buttonClicked() {
-    DBG("Clicked");
+    FileBrowserComponent fileBrowserComponent (FileBrowserComponent::FileChooserFlags::saveMode,
+            File(),
+            nullptr,
+            nullptr);
+    FileChooserDialogBox fileChooserDialogBox ("Save file", "Save output file from algorithm network", fileBrowserComponent, true, Colours::lightgrey);
 
-    // TODO
+    if(fileChooserDialogBox.show()) {
+
+        // TODO
 
 //    standard::Algorithm* pitchYinFft = standard::AlgorithmFactory::create("PitchYinFFT",
 //            "frameSize", frameSize);
 
 //    pitchYinFft->input()
 
+        auto selectedFile = fileBrowserComponent.getSelectedFile(0);
 
-    standard::Algorithm* output = standard::AlgorithmFactory::create("YamlOutput",
-                                                                     "filename", "test_pitchyinfft.yaml");
-    output->input("pool").set(pool);
-    output->compute();
+        standard::Algorithm *output = standard::AlgorithmFactory::create("YamlOutput",
+                                                                         "filename",
+                                                                         selectedFile.getFullPathName().toStdString());
+//                                                                         "test_pitchyinfft.yaml");
+
+
+        auto descriptorNames = pool.descriptorNames();
+        for (int i = 0; i < descriptorNames.size(); ++i) {
+            DBG("Descriptor: " + descriptorNames[i]);
+        }
+
+        output->input("pool").set(pool);
+        output->compute();
+
+    }
+
 
 }
 
 
 void MainContentComponent::resized() {
-    levelLabel.setBounds(10, 10, 90, 20);
-    levelSlider.setBounds(100, 10, getWidth() - 110, 20);
     start.setBounds(10, 40, 90, 20);
     saveSample.setBounds(10, 40, 90, 20);
 }
