@@ -19,7 +19,8 @@ MainContentComponent::MainContentComponent() {
 
 
 void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate) {
-    DBG("Samples per block expected: " +std::to_string(samplesPerBlockExpected) +". Sample rate: " +std::to_string(sampleRate));
+    DBG("Samples per block expected: " + std::to_string(samplesPerBlockExpected) + ". Sample rate: " +
+        std::to_string(sampleRate));
 
     AlgorithmFactory &factory = streaming::AlgorithmFactory::instance();
 
@@ -31,6 +32,7 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
 
 //    gen->setParameters(parameterMap);
 //        gen->_bufferSize = frameSize;
+
     gen->output(0).setAcquireSize(frameSize);
     gen->output(0).setReleaseSize(frameSize);
 
@@ -46,22 +48,21 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
 
     fc->output("frame") >> w->input("frame");
     w->output("frame") >> spec->input("frame");
-
-    streaming::Algorithm* pitchYinFft = streaming::AlgorithmFactory::create("PitchYinFFT",
-                                                                          "frameSize", frameSize);
-
+    streaming::Algorithm *pitchYinFft = streaming::AlgorithmFactory::create("PitchYinFFT",
+                                                                            "frameSize", frameSize);
     spec->output("spectrum") >> pitchYinFft->input("spectrum");
-
-//    Algorithm *file = new FileOutput<Real>();
-//    file->configure("filename", "test_output2.txt", "pitchyinfft", "text");
-
-//    gen->output("signal") >> file->input("data");
-
     pitchYinFft->output("pitch") >> essentia::streaming::PoolConnector(pool, "pitch");
-    pitchYinFft->output("pitchConfidence") >> essentia::streaming::PoolConnector(pool, "pitchConfidence");
+    pitchYinFft->output("pitchConfidence") >> essentia::streaming::PoolConnector(pool, "pitch_confidence");
 
-    // TODO Why is there no output spectrum in the yaml-file?
-    spec->output("spectrum") >> essentia::streaming::PoolConnector(pool, "spectrum");
+//    spec->output("spectrum") >> essentia::streaming::PoolConnector(pool, "spectrum");
+
+
+    streaming::Algorithm *pitchMelodia = streaming::AlgorithmFactory::create("PitchMelodia", "frameSize", frameSize,
+                                                                             "hopSize", hopSize, "guessUnvoiced", true);
+    gen->output("signal") >> pitchMelodia->input("signal");
+
+    pitchMelodia->output("pitch") >> essentia::streaming::PoolConnector(pool, "melodia_pitch");
+    pitchMelodia->output("pitchConfidence") >> essentia::streaming::PoolConnector(pool, "melodia_pitch_confidence");
 
     network = new scheduler::Network(gen);
 //        network->initStack();
@@ -88,8 +89,8 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
     auto maxOutputChannels = activeOutputChannels.getHighestBit() + 1;
 
     for (auto channel = 0;
-            channel < maxOutputChannels;
-            ++channel) {
+         channel < maxOutputChannels;
+         ++channel) {
         if ((!activeOutputChannels[channel]) || maxInputChannels == 0) {
             bufferToFill.buffer->
                     clear(channel, bufferToFill
@@ -97,13 +98,11 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
         } else {
             auto actualInputChannel = channel % maxInputChannels;
 
-            if (!activeInputChannels[channel])
-            {
+            if (!activeInputChannels[channel]) {
                 bufferToFill.buffer->
                         clear(channel, bufferToFill
                         .startSample, bufferToFill.numSamples);
-            } else
-            {
+            } else {
                 auto *inBuffer = bufferToFill.buffer->getReadPointer(actualInputChannel,
                                                                      bufferToFill.startSample);
                 auto *outBuffer = bufferToFill.buffer->getWritePointer(channel, bufferToFill.startSample);
@@ -141,13 +140,14 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
 }
 
 void MainContentComponent::buttonClicked() {
-    FileBrowserComponent fileBrowserComponent (FileBrowserComponent::FileChooserFlags::saveMode,
-            File(),
-            nullptr,
-            nullptr);
-    FileChooserDialogBox fileChooserDialogBox ("Save file", "Save output file from algorithm network", fileBrowserComponent, true, Colours::lightgrey);
+    FileBrowserComponent fileBrowserComponent(FileBrowserComponent::FileChooserFlags::saveMode,
+                                              File(),
+                                              nullptr,
+                                              nullptr);
+    FileChooserDialogBox fileChooserDialogBox("Save file", "Save output file from algorithm network",
+                                              fileBrowserComponent, true, Colours::lightgrey);
 
-    if(fileChooserDialogBox.show()) {
+    if (fileChooserDialogBox.show()) {
 
         // TODO
 
@@ -161,7 +161,6 @@ void MainContentComponent::buttonClicked() {
         standard::Algorithm *output = standard::AlgorithmFactory::create("YamlOutput",
                                                                          "filename",
                                                                          selectedFile.getFullPathName().toStdString());
-//                                                                         "test_pitchyinfft.yaml");
 
 
         auto descriptorNames = pool.descriptorNames();
