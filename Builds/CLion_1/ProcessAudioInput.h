@@ -90,11 +90,18 @@ private:
     Pool pool;
     scheduler::Network *network = NULL;
 
+    volatile bool networkSetup = false;
+    volatile bool recording = false;
+
     const int frameSize = 1024;
     const int hopSize = 512;
 
+    void setupNetwork(int samplesPerBlockExpected, double sampleRate);
+
     void runNetwork();
-    void buttonClicked();
+
+    void startClicked();
+    void saveClicked();
 
     std::thread audioProcessor;
 

@@ -7,10 +7,11 @@ MainContentComponent::MainContentComponent() {
 
     addAndMakeVisible(start);
     start.setButtonText("Start");
+    start.onClick = [this] { startClicked(); };
 
     addAndMakeVisible(saveSample);
     saveSample.setButtonText("Save sample");
-    saveSample.onClick = [this] { buttonClicked(); };
+    saveSample.onClick = [this] { saveClicked(); };
 
     setSize(600, 100);
     setAudioChannels(2, 2);
@@ -19,6 +20,13 @@ MainContentComponent::MainContentComponent() {
 
 
 void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate) {
+    if(!networkSetup) {
+        setupNetwork(samplesPerBlockExpected, sampleRate);
+        networkSetup = true;
+    }
+}
+
+void MainContentComponent::setupNetwork(int samplesPerBlockExpected, double sampleRate) {
     DBG("Samples per block expected: " + std::to_string(samplesPerBlockExpected) + ". Sample rate: " +
         std::to_string(sampleRate));
 
@@ -71,9 +79,6 @@ void MainContentComponent::prepareToPlay(int samplesPerBlockExpected, double sam
 // TODO Is it necessary to run this here?
     audioProcessor = std::thread(&MainContentComponent::runNetwork, this);
 //    network->run();
-
-
-
 }
 
 void MainContentComponent::runNetwork() {
@@ -82,6 +87,10 @@ void MainContentComponent::runNetwork() {
 
 
 void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &bufferToFill) {
+    if(!recording) {
+        bufferToFill.clearActiveBufferRegion();
+        return;
+    }
     auto *device = deviceManager.getCurrentAudioDevice();
     auto activeInputChannels = device->getActiveInputChannels();
     auto activeOutputChannels = device->getActiveOutputChannels();
@@ -139,7 +148,12 @@ void MainContentComponent::getNextAudioBlock(const AudioSourceChannelInfo &buffe
     }
 }
 
-void MainContentComponent::buttonClicked() {
+void MainContentComponent::startClicked() {
+    recording = true;
+}
+
+void MainContentComponent::saveClicked() {
+    recording = false;
     FileBrowserComponent fileBrowserComponent(FileBrowserComponent::FileChooserFlags::saveMode,
                                               File(),
                                               nullptr,
@@ -171,6 +185,10 @@ void MainContentComponent::buttonClicked() {
         output->input("pool").set(pool);
         output->compute();
 
+        networkSetup = false;
+
+
+
     }
 
 
@@ -178,6 +196,6 @@ void MainContentComponent::buttonClicked() {
 
 
 void MainContentComponent::resized() {
-    start.setBounds(10, 40, 90, 20);
+    start.setBounds(10, 10, 90, 20);
     saveSample.setBounds(10, 40, 90, 20);
 }
